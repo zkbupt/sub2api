@@ -906,6 +906,24 @@ type GatewayConfig struct {
 	// UserMessageQueue: 用户消息串行队列配置
 	// 对 role:"user" 的真实用户消息实施账号级串行化 + RPM 自适应延迟
 	UserMessageQueue UserMessageQueueConfig `mapstructure:"user_message_queue"`
+
+	// TrustedClientRequestID: 受信任入站 X-Client-Request-ID 播种配置。
+	// 默认关闭，行为与原生一致；开启并携带匹配 trust token 时，从入站
+	// X-Client-Request-ID 播种 ctxkey.ClientRequestID（仅接受规范小写 UUIDv7），
+	// 使 usage_logs.request_id 恒为 client:<平台请求ID>，供 B 线 Wallet Bridge
+	// 关联结算。平台契约见 transfers/contracts/request-id.md。
+	TrustedClientRequestID GatewayTrustedClientRequestIDConfig `mapstructure:"trusted_client_request_id"`
+}
+
+// GatewayTrustedClientRequestIDConfig 控制受信任入站请求 ID 播种。
+type GatewayTrustedClientRequestIDConfig struct {
+	// Enabled: 总开关（默认 false）。关闭时忽略入站 X-Client-Request-ID，行为同原生。
+	Enabled bool `mapstructure:"enabled"`
+	// TrustToken: 受信任来源（Wallet Bridge）必须在 TrustHeader 中提供的共享密钥。
+	// 为空时即使 Enabled=true 也不播种（安全默认）。生产环境使用高熵随机值。
+	TrustToken string `mapstructure:"trust_token"`
+	// TrustHeader: 携带 TrustToken 的请求头名（默认 X-Internal-Trust-Token）。
+	TrustHeader string `mapstructure:"trust_header"`
 }
 
 // GatewayOpenAIHTTP2Config OpenAI HTTP 上游协议配置。
@@ -2038,6 +2056,11 @@ func setDefaults() {
 	viper.SetDefault("gateway.max_account_switches_gemini", 3)
 	viper.SetDefault("gateway.force_codex_cli", false)
 	viper.SetDefault("gateway.codex_image_generation_bridge_enabled", false)
+	viper.SetDefault("gateway.trusted_client_request_id.enabled", false)
+	// 注册空默认值：viper AutomaticEnv 仅对已知 key 生效，否则经环境变量
+	// （GATEWAY_TRUSTED_CLIENT_REQUEST_ID_TRUST_TOKEN）配置的 token 在 Unmarshal 时不会被绑定。
+	viper.SetDefault("gateway.trusted_client_request_id.trust_token", "")
+	viper.SetDefault("gateway.trusted_client_request_id.trust_header", "X-Internal-Trust-Token")
 	viper.SetDefault("gateway.openai_passthrough_allow_timeout_headers", false)
 	viper.SetDefault("gateway.openai_compact_model", "gpt-5.4")
 	// OpenAI Responses WebSocket（默认开启；可通过 force_http 紧急回滚）

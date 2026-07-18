@@ -23,7 +23,10 @@ func RegisterGatewayRoutes(
 	cfg *config.Config,
 ) {
 	bodyLimit := middleware.RequestBodyLimit(cfg.Gateway.MaxBodySize)
-	clientRequestID := middleware.ClientRequestID()
+	// 受信任入站播种：默认关闭时等价于原生 ClientRequestID()；开启后从受信任的
+	// X-Client-Request-ID 播种关联键。所有下游路由复用同一 clientRequestID 变量，
+	// 故仅此一处改动即可覆盖全部网关端点。见 transfers/contracts/request-id.md。
+	clientRequestID := middleware.ClientRequestIDWithTrustedSeed(cfg.Gateway.TrustedClientRequestID)
 	opsErrorLogger := handler.OpsErrorLoggerMiddleware(opsService)
 	endpointNorm := handler.InboundEndpointMiddleware()
 
